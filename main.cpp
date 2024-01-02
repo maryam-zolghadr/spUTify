@@ -5,6 +5,7 @@
 #define REQUEST_ERR "Bad Request"
 #define NOT_FOUND "Not Found"
 #define PERMISSION_DENIED "Permission Denied"
+#define EMPTY "Empty"
 using namespace std;
 class User
 {
@@ -23,18 +24,40 @@ public:
     int status = 0;
     string get_password() {return password;};
     void set_password(string password) {this -> password = password;};
+    vector<string> print_user()
+    {
+        vector<string> res(4); // Initialize the vector with 4 elements
+        res[0] = to_string(this->user_id); // Convert int to string
+        res[1] = this->mode;
+        res[2] = this->user_name;
+        res[3] = to_string(this->song_num()); // Convert int to string
+        return res;
+    }
+    virtual int song_num() = 0;
 private:
     string password;
 };
 
 class RegularUsr : public User
 {
-
+public:
+    int song_num() override
+    {
+        return playlist_num;
+    }
+private:
+    int playlist_num = 0;
 };
 
 class Artist : public User
 {
-
+public:
+    int song_num() override
+    {
+        return songs_num;
+    }
+private:
+    int songs_num = 0;
 };
 
 class Song
@@ -48,6 +71,10 @@ private:
     string song_name;
     string artist;
     int song_id;
+    int Year;
+    string Album;
+    string Tags;
+    int Duration;
 };
 
 class CommandManagement
@@ -80,8 +107,7 @@ public:
         {
             if(user_name == user->user_name)
             {
-                cout << REQUEST_ERR << endl;
-                return;
+                throw REQUEST_ERR;
             }
         }
         User* new_user;
@@ -95,16 +121,14 @@ public:
         }
         else
         {
-            cout << mode << endl;
-            cout << REQUEST_ERR << endl;
-            return;
+            throw REQUEST_ERR;
         }
         new_user->set_new_user(user_name, password, mode, next_user_id);
         next_user_id += 1;
         new_user->status = 1;
         users.push_back(new_user);
         current_user = new_user;
-        cout << "OK" << endl;
+        throw string("OK");
     }
 
     void login(const string& user_name, const string& password)
@@ -120,36 +144,33 @@ public:
                     tmp = 2;
                     user->status = 1;
                     current_user = user;
-                    cout << "OK" << endl;
-                    return;
+                    throw string("OK");
                 }
             }
         }
         if(tmp == 0)
         {
-            cout << "Not Found" << endl;
-            return;
+            throw NOT_FOUND;
         }
         if(tmp == 1)
         {
-            cout << PERMISSION_DENIED << endl;
-            return;
+            throw PERMISSION_DENIED;
         }
     }
 
     void log_out()
     {
         current_user = nullptr;
-        cout << "OK" << endl;
+        throw string("OK");
     }
 
     void handle_read_input(const string& command)
     {
+        tokens.clear();
         istringstream iss(command);
-        vector<string> tokens;
-        string token = ""; // Change NULL to ""
+        string token = "";
         bool insideBlock = false;
-        string blockValue = ""; // Change NULL to ""
+        string blockValue = ""; 
 
         while (getline(iss, token, ' ')) 
         {
@@ -173,26 +194,24 @@ public:
                 tokens.push_back(token);
             }
         }        
-        handle_input(tokens);
     }
 
-    void handle_command_passing(string order, vector<string> tokens)
+    void handle_command_post_type(const string& order)
     {
         if(order == "signup")
         {
             if(current_user != nullptr)
             {
-                cout << "Permission Denied" << endl;
-                return;
+                throw PERMISSION_DENIED;
             }
             sign_up(tokens[4], extract_content(tokens[6]), extract_content(tokens[8]));
         }
+
         if(order == "login")
         {
             if(current_user != nullptr)
             {
-                cout << "Permission Denied" << endl;
-                return;
+                throw PERMISSION_DENIED;
             }
             login(tokens[4], extract_content(tokens[6]));
         }
@@ -200,15 +219,57 @@ public:
         {
             if(current_user == nullptr)
             {
-                cout << "Permission Denied" << endl;
-                return;
+                throw PERMISSION_DENIED;
             }
             log_out();
         }
-
     }
 
-    void handle_input(vector<string> tokens)
+    void handle_command_get_type(const string& order)
+    {
+        bool all = true;
+        if(current_user == nullptr)
+        {
+            throw PERMISSION_DENIED;
+        }
+        if(tokens.size() > 3)
+        {
+            all = false;
+            int id = stoi(tokens[4]);
+        }
+        if(order == "musics")
+        {
+            if(all == true)
+            {
+                for(int i = 0; i < songs.size(); i++)
+                {
+                    songs[i].print_song();
+                }
+            }
+        }
+        if(order == "users")
+        {
+            if(users.size() == 0)
+                throw EMPTY;
+            if(all == true)
+            {
+                
+            }
+            else
+            {
+
+            }
+        }
+    }
+
+    void print_all_users()
+    {
+        for(int i = 0; i < users.size(); i++)
+        {
+            users[i]->print_user();
+        }
+    }
+    void process_command()
     {
         int check = 0;
         if(tokens[0] == "POST")
@@ -218,18 +279,29 @@ public:
                 if(tokens[1] == order)
                 {
                     check = 1;
-                    handle_command_passing(order, tokens);
+                    handle_command_post_type(order);
                 }
             }
             if(check == 0)
             {
-                cout << "Not Found" << endl;
+                throw NOT_FOUND;
             }
         }
 
         else if(tokens[0] == "GET")
         {
-
+            for(const string& order : get_orders)
+            {
+                if(tokens[1] == order)
+                {
+                    check = 1;
+                    handle_command_get_type(order);
+                }
+            }
+            if(check == 0)
+            {
+                throw NOT_FOUND;
+            }        
         }
 
         else if(tokens[0] == "DELETE")
@@ -243,21 +315,26 @@ public:
         }
 
         else
-            cout << "Permission Denied" << endl;
-        for(int i = 0; i < users.size(); i++)
-        {
-            cout << users[i]->user_name << " " << users[i]->user_id << " " << users[i]->get_password() << " " << users[i]->mode << endl;
-            cout << "-------------------------" << endl;
-        }
-        if(current_user != nullptr)
-            cout << current_user->user_name << endl;
-        else
-            cout << "pishoo " << endl;
-
+            throw REQUEST_ERR;
     }
 
+    void print_users()
+    {
+        cout << "ID, Mode, Username, Playlists_number/Songs_number" << endl;
+        for(int i = 0; i < users.size(); i++)
+        {
+            vector<string> user_info = users[i]->print_user(); // Get the user info vector
+            for(int j = 0; j < 4; j++)
+            {
+                cout << user_info[j]; // Print each element of the user info vector
+                cout << ", ";
+            }
+            cout << "\n";
+        }
+    }
     void print_all_songs()
     {
+        cout << "ID, Name, Artist" << endl;
         for(auto& song : songs)
         {
             song.print_song();
@@ -271,6 +348,38 @@ public:
         post_orders.push_back("logout");
         post_orders.push_back("playlist");
         post_orders.push_back("music");
+
+        get_orders.push_back("musics");
+        get_orders.push_back("users");
+
+    }
+    
+    void run(const string& command)
+    {
+        handle_read_input(command);
+        try
+        {
+            process_command();
+        }
+        catch(const string& EX_msg)
+        {
+            cout << ":normal af:" << endl;
+            cout << EX_msg << endl;
+        }
+        catch(const char* ex)
+        {
+            cout << "wtf" << endl;
+            cout << ex << endl;
+        }
+        catch(...)
+        {
+            cout << "An unexpected error occurred." << endl;
+        }
+        for(int i = 0; i < users.size(); i++)
+        {
+            cout << users[i]->user_name << " " << users[i]->get_password() << " " << users[i]->user_id << " " << users[i]->mode << endl;
+            cout << "----------------------" << endl;
+        }
     }
 private:
     string command_type;
@@ -283,6 +392,7 @@ private:
     vector<string> delete_orders;
     vector<string> put_ordres;
     vector<Song> songs;
+    vector<string> tokens;
 };
  
 int main(int argc, char* argv[])
@@ -293,7 +403,7 @@ int main(int argc, char* argv[])
     while(true)
     {
         getline(cin, command);
-        command_management.handle_read_input(command);
+        command_management.run(command);
         if(command.empty())
         {
             return 0;
