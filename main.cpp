@@ -19,6 +19,21 @@ public:
         info[2] = this->artist;
         return info;
     }
+    vector<string> get_full_info()
+    {
+        vector<string> info(8);
+        string tmp, tmp2;
+        tmp = to_string(song_id);
+        tmp2 = to_string(year);
+        info[0] = tmp;
+        info[1] = this->song_name;
+        info[2] = this->artist;
+        info[3] = tmp2;
+        info[4] = this->album;
+        info[5] = this->tmp_tag;
+        info[6] = this->duration;
+        return info;
+    }
     void set_song(const string& title, const string& path, const string& year, const string& album, const string& tags, const string& s_duration, const int& id, const string& artist)
     {
         this->song_name = title;
@@ -29,14 +44,16 @@ public:
         this->artist = artist;
         stringstream ss(tags);
         string token;
+        this->tmp_tag = tags;
         while (getline(ss, token, ';')) 
         {
             this->tags.push_back(token);
         }
         this->duration = s_duration; // edit this
     }
-    
+    int get_id() {return song_id;};
     private:
+    string tmp_tag;
     string song_name;
     string artist;
     int song_id;
@@ -291,13 +308,17 @@ public:
         if(tokens.size() > 3)
         {
             all = false;
-            int id = stoi(tokens[4]);
+            int id = stoi(declare_variables("id"));
         }
         if(order == "musics")
         {
             if(all == true)
             {
                 print_all_songs();
+            }
+            else
+            {
+                print_wanted_song(declare_variables("id"));
             }
         }
         if(order == "users")
@@ -315,6 +336,28 @@ public:
         }
     }
 
+    void print_wanted_song(const string& id)
+    {
+        int check = 0;
+        cout << "ID, Name, Artist, Year, Album, Tags, Duration" << endl;
+        for(Song& song : songs)
+        {
+            if(song.get_id() == stoi(id))
+            {
+                check = 1;
+                vector<string> info = song.get_full_info();
+                for(int i = 0; i < info.size() - 1; i++)
+                {
+                    cout << info[i];
+                    if(i != info.size() - 2)
+                        cout << ", ";
+                }
+                cout << endl;
+                return;
+            }
+        }
+        throw NOT_FOUND;
+    }
     void process_command()
     {
         int check = 0;
