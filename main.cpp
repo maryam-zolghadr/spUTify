@@ -7,6 +7,44 @@
 #define PERMISSION_DENIED "Permission Denied"
 #define EMPTY "Empty"
 using namespace std;
+class Song
+{
+public:
+    vector<string> song_info()
+    {
+        vector<string> info(3);
+        info[0] = this->song_id;
+        info[1] = this->song_name;
+        info[2] = this->artist;
+        return info;
+    }
+    void set_song(const string& title, const string& path, const string& year, const string& album, const string& tags, const string& s_duration, const int& id)
+    {
+        this->song_name = title;
+        this->song_id = id;
+        this->year = stoi(year);
+        this->path = path;
+        this->album = album;
+        stringstream ss(tags);
+        string token;
+        while (getline(ss, token, ';')) 
+        {
+            this->tags.push_back(token);
+        }
+        this->duration = s_duration; // edit this
+    }
+    
+    private:
+    string song_name;
+    string artist;
+    int song_id;
+    int year;
+    string album;
+    string duration;
+    string path;
+    vector<string> tags;
+};
+
 class User
 {
 public:
@@ -24,16 +62,17 @@ public:
     int status = 0;
     string get_password() {return password;};
     void set_password(string password) {this -> password = password;};
-    vector<string> print_user()
+    vector<string> user_info_to_print()
     {
         vector<string> res(4); // Initialize the vector with 4 elements
         res[0] = to_string(this->user_id); // Convert int to string
         res[1] = this->mode;
         res[2] = this->user_name;
-        res[3] = to_string(this->song_num()); // Convert int to string
+        res[3] = to_string(this->tot_song_o_playlist()); // Convert int to string
         return res;
     }
-    virtual int song_num() = 0;
+    string song_O_playlist;
+    virtual int tot_song_o_playlist() = 0;
 private:
     string password;
 };
@@ -41,7 +80,8 @@ private:
 class RegularUsr : public User
 {
 public:
-    int song_num() override
+    RegularUsr() {song_O_playlist = "Playlists";}
+    int tot_song_o_playlist() override
     {
         return playlist_num;
     }
@@ -52,29 +92,21 @@ private:
 class Artist : public User
 {
 public:
-    int song_num() override
+    Artist() {song_O_playlist = "Songs";}
+    Song add_song(const string& title, const string& path, const string& year, const string& album, const string& tags, const string& duration, const int& id)
+    {
+        Song song;
+        song.set_song(title, path, year, album, tags, duration, id);
+        singer_songs.push_back(song);
+        return song;
+    }
+    int tot_song_o_playlist() override
     {
         return songs_num;
     }
 private:
     int songs_num = 0;
-};
-
-class Song
-{
-public:
-    void print_song()
-    {
-        cout << song_id << ", " << song_name << ", " << artist << endl;
-    }
-private:
-    string song_name;
-    string artist;
-    int song_id;
-    int Year;
-    string Album;
-    string Tags;
-    int Duration;
+    vector<Song> singer_songs;
 };
 
 class CommandManagement
@@ -174,47 +206,31 @@ public:
 
         while (getline(iss, token, ' ')) 
         {
-            if (token.front() == '<' && token.back() != '>')
+            if (token.front() == '<' && token.back() == '>')
             {
-                insideBlock = true;
-                blockValue = token.substr(1);
+                token = extract_content(token);
+
             }
-            else if (insideBlock && token.back() == '>')
-            {
-                insideBlock = false;
-                blockValue += " " + token.substr(0, token.size() - 1);
-                tokens.push_back(blockValue);
-            }
-            else if (insideBlock)
-            {
-                blockValue += " " + token;
-            }
-            else
-            {
                 tokens.push_back(token);
-            }
-        }        
+        } 
     }
 
+    string declare_variables(string variable)
+    {
+        for(int i = 0; i < tokens.size(); i++)
+        {
+            if(tokens[i] == variable)
+            {
+                if(i + 1 != tokens.size())
+                {
+                    return tokens[i + 1];
+                }
+            }
+        }
+        throw REQUEST_ERR;
+    }
     void handle_command_post_type(const string& order)
     {
-        if(order == "signup")
-        {
-            if(current_user != nullptr)
-            {
-                throw PERMISSION_DENIED;
-            }
-            sign_up(tokens[4], extract_content(tokens[6]), extract_content(tokens[8]));
-        }
-
-        if(order == "login")
-        {
-            if(current_user != nullptr)
-            {
-                throw PERMISSION_DENIED;
-            }
-            login(tokens[4], extract_content(tokens[6]));
-        }
         if(order == "logout")
         {
             if(current_user == nullptr)
@@ -223,8 +239,49 @@ public:
             }
             log_out();
         }
-    }
 
+        if(order == "music")
+        {
+            if(current_user == nullptr)
+            {
+                throw PERMISSION_DENIED;
+            }
+            if(current_user->mode != "artist")
+            {
+                throw PERMISSION_DENIED;
+            }
+            add_song();
+        }
+
+        if(order == "signup")
+        {
+            if(current_user != nullptr)
+            {
+                throw PERMISSION_DENIED;
+            }
+            sign_up(declare_variables("username"), declare_variables("password"), declare_variables("mode"));
+        }
+
+        if(order == "login")
+        {
+            if(current_user != nullptr)
+            {
+                throw PERMISSION_DENIED;
+            }        
+            login(declare_variables("username"), declare_variables("password"));
+        }
+    }
+    void add_song()
+    {
+        if (dynamic_cast<Artist*>(current_user) != nullptr) 
+        {
+            Artist* artist = dynamic_cast<Artist*>(current_user);
+            Song tmp_song = artist->add_song(declare_variables("title"), declare_variables("path"), declare_variables("year"), declare_variables("album"), declare_variables("tags"), declare_variables("duration"), next_song_id);
+            next_song_id += 1;
+            songs.push_back(tmp_song);
+            cout << tmp_song.song_info()[0] << " " << tmp_song.song_info()[1] << " " <<  tmp_song.song_info()[2] << endl;
+        }
+    }
     void handle_command_get_type(const string& order)
     {
         bool all = true;
@@ -241,10 +298,7 @@ public:
         {
             if(all == true)
             {
-                for(int i = 0; i < songs.size(); i++)
-                {
-                    songs[i].print_song();
-                }
+                print_all_songs();
             }
         }
         if(order == "users")
@@ -253,7 +307,7 @@ public:
                 throw EMPTY;
             if(all == true)
             {
-                
+                //print_all_users();
             }
             else
             {
@@ -262,16 +316,10 @@ public:
         }
     }
 
-    void print_all_users()
-    {
-        for(int i = 0; i < users.size(); i++)
-        {
-            users[i]->print_user();
-        }
-    }
     void process_command()
     {
         int check = 0;
+        cout << tokens[0] << endl;
         if(tokens[0] == "POST")
         {
             for(const string& order : post_orders)
@@ -298,10 +346,10 @@ public:
                     handle_command_get_type(order);
                 }
             }
-            if(check == 0)
-            {
-                throw NOT_FOUND;
-            }        
+            // if(check == 0)
+            // {
+            //     throw NOT_FOUND;
+            // }        
         }
 
         else if(tokens[0] == "DELETE")
@@ -317,27 +365,34 @@ public:
         else
             throw REQUEST_ERR;
     }
-
-    void print_users()
-    {
-        cout << "ID, Mode, Username, Playlists_number/Songs_number" << endl;
-        for(int i = 0; i < users.size(); i++)
-        {
-            vector<string> user_info = users[i]->print_user(); // Get the user info vector
-            for(int j = 0; j < 4; j++)
-            {
-                cout << user_info[j]; // Print each element of the user info vector
-                cout << ", ";
-            }
-            cout << "\n";
-        }
-    }
+    // void print_user(int id)
+    // {
+    //     int n = id - 1;
+    //     cout << "ID: " << id;
+    //     cout << "Mode: " << users[n]->mode;
+    //     cout << "Username: " << users[n]->user_name;
+    //     cout << users[n]->song_O_playlist << ": ";
+    // }
+    // void print_all_users()
+    // {
+    //     cout << "ID, Mode, Username, Playlists_number/Songs_number" << endl;
+    //         for(int i = 0; i < users.size(); i++)
+    //         {
+    //             vector<string> info = users[i]->user_info_to_print();
+    //             for(int j = 0; j < info.size(); j++)
+    //             {
+    //                 cout << info[j];
+    //                 cout << ", ";
+    //             }
+    //             cout << endl;
+    //         }
+    // }
     void print_all_songs()
     {
         cout << "ID, Name, Artist" << endl;
         for(auto& song : songs)
         {
-            song.print_song();
+            song.song_info();
         }
     }
 
@@ -356,6 +411,8 @@ public:
     
     void run(const string& command)
     {
+        if(command == " ")
+            return;
         handle_read_input(command);
         try
         {
@@ -363,12 +420,10 @@ public:
         }
         catch(const string& EX_msg)
         {
-            cout << ":normal af:" << endl;
             cout << EX_msg << endl;
         }
         catch(const char* ex)
         {
-            cout << "wtf" << endl;
             cout << ex << endl;
         }
         catch(...)
@@ -378,7 +433,17 @@ public:
         for(int i = 0; i < users.size(); i++)
         {
             cout << users[i]->user_name << " " << users[i]->get_password() << " " << users[i]->user_id << " " << users[i]->mode << endl;
-            cout << "----------------------" << endl;
+            if (current_user != nullptr)
+            cout << "----------- " << current_user->user_name << " -----------" << endl;
+        }
+        if(songs.size() != 0)
+        {
+            for(int i = 0; i < songs.size(); i++)
+            {
+                vector<string> shit = songs[i].song_info();
+                cout << songs[i].song_info()[0] << " " << songs[i].song_info()[1] << " " << songs[i].song_info()[3] << endl;
+                cout << "-------------------------" << endl;
+            }
         }
     }
 private:
@@ -386,6 +451,7 @@ private:
     int song_id;
     vector<User*> users;
     int next_user_id = 1;
+    int next_song_id = 1;
     User* current_user = nullptr;
     vector<string> post_orders;
     vector<string> get_orders;
