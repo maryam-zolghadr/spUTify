@@ -75,6 +75,16 @@ public:
         this ->user_id = id;
         this ->status = 1;        
     }
+    vector<string> user_info()
+    {
+        string tmp = to_string(tot_song_o_playlist());
+        vector<string> info(5);
+        info[0] = to_string(user_id);
+        info[1] = this->mode;
+        info[2] = this->user_name;
+        info[3] = tmp;
+        return info;
+    }
     string user_name;
     int user_id;
     string mode;
@@ -83,11 +93,11 @@ public:
     void set_password(string password) {this -> password = password;};
     vector<string> user_info_to_print()
     {
-        vector<string> res(4); // Initialize the vector with 4 elements
-        res[0] = to_string(this->user_id); // Convert int to string
+        vector<string> res(4); 
+        res[0] = to_string(this->user_id); 
         res[1] = this->mode;
         res[2] = this->user_name;
-        res[3] = to_string(this->tot_song_o_playlist()); // Convert int to string
+        res[3] = to_string(this->tot_song_o_playlist()); 
         return res;
     }
     string song_O_playlist;
@@ -115,7 +125,6 @@ public:
     Song add_song(const string& title, const string& path, const string& year, const string& album, const string& tags, const string& duration, const int& id)
     {
         Song song;
-        cout << "username: " << user_name << endl;
         song.set_song(title, path, year, album, tags, duration, id, user_name);
         singer_songs.push_back(song);
         tot_songs += 1;
@@ -327,7 +336,7 @@ public:
                 throw EMPTY;
             if(all == true)
             {
-                //print_all_users();
+                print_all_users();
             }
             else
             {
@@ -414,20 +423,23 @@ public:
     //     cout << "Username: " << users[n]->user_name;
     //     cout << users[n]->song_O_playlist << ": ";
     // }
-    // void print_all_users()
-    // {
-    //     cout << "ID, Mode, Username, Playlists_number/Songs_number" << endl;
-    //         for(int i = 0; i < users.size(); i++)
-    //         {
-    //             vector<string> info = users[i]->user_info_to_print();
-    //             for(int j = 0; j < info.size(); j++)
-    //             {
-    //                 cout << info[j];
-    //                 cout << ", ";
-    //             }
-    //             cout << endl;
-    //         }
-    // }
+    void print_all_users()
+    {
+        cout << "ID, Mode, Username, Playlists_number/Songs_number" << endl;
+        for(User* user : users)
+        {
+            vector<string> info = user->user_info();
+            for(int i = 0; i < info.size() - 1; i++)
+            {
+                cout << info[i];
+                if(i != info.size() - 2)
+                {
+                    cout << ", ";
+                }
+            }
+            cout << endl;
+        }
+    }
     void print_all_songs()
     {
         cout << "ID, Name, Artist" << endl;
