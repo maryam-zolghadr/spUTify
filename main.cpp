@@ -278,6 +278,7 @@ public:
             Song tmp_song = artist->add_song(declare_variables("title"), declare_variables("path"), declare_variables("year"), declare_variables("album"), declare_variables("tags"), declare_variables("duration"), next_song_id);
             next_song_id += 1;
             songs.push_back(tmp_song);
+            throw string("OK");
         }
     }
     void handle_command_get_type(const string& order)
@@ -342,11 +343,11 @@ public:
                     check = 1;
                     handle_command_get_type(order);
                 }
-            }
-            // if(check == 0)
-            // {
-            //     throw NOT_FOUND;
-            // }        
+            }   
+            if(check == 0)
+            {
+                throw NOT_FOUND;
+            }    
         }
 
         else if(tokens[0] == "DELETE")
@@ -389,7 +390,16 @@ public:
         cout << "ID, Name, Artist" << endl;
         for(auto& song : songs)
         {
-            song.song_info();
+            vector<string> info = song.song_info();
+            for(int i = 0; i < info.size() - 1; i++)
+            {
+                cout << info[i];
+                if(i != info.size() - 2)
+                {
+                    cout << ", ";
+                }
+            }
+            cout << endl;
         }
     }
 
