@@ -149,6 +149,7 @@ public:
         }
         return res;
     }
+    vector<Song> singer_musics() {return singer_songs;};
 private:
     int tot_songs = 0;
     vector<Song> singer_songs;
@@ -358,17 +359,54 @@ public:
                 print_wanted_user(declare_variables("id"));
             }
         }
+        if(order == "registered_musics")
+        {
+            print_artist_musics();
+        }
+    }
+    void handle_command_delete_type(const string& order)
+    {
+        if(current_user == nullptr)
+        {
+            throw PERMISSION_DENIED;
+        }
+        if(order == "music")
+        {
+            //delete_song(declare_variables("id"));
+        }
     }
 
+    void print_artist_musics()
+    {
+        cout << "ID, Name, Artist, Year, Album, Tags, Duration" << endl;
+        if (dynamic_cast<Artist*>(current_user) != nullptr) 
+        {
+            Artist* artist = dynamic_cast<Artist*>(current_user);
+            vector<Song> song_tmp = artist->singer_musics();  
+            cout << song_tmp.size() << endl;
+            if(song_tmp.size() == 0)
+                throw EMPTY;
+            for(int i = 0; i < song_tmp.size(); i++)
+            {
+                vector<string> info = song_tmp[i].get_full_info();
+                for(int i = 0; i < info.size(); i++)
+                {
+                    cout << info[i];
+                    if(i != info.size() - 2)
+                        cout << ", ";
+                }
+                cout << endl;
+            }
+            return;                
+        }  
+    }
     void print_wanted_song(const string& id)
     {
-        int check = 0;
         cout << "ID, Name, Artist, Year, Album, Tags, Duration" << endl;
         for(Song& song : songs)
         {
             if(song.get_id() == stoi(id))
             {
-                check = 1;
                 vector<string> info = song.get_full_info();
                 for(int i = 0; i < info.size() - 1; i++)
                 {
@@ -419,7 +457,18 @@ public:
 
         else if(tokens[0] == "DELETE")
         {
-
+            for(const string& order : delete_orders)
+            {
+                if(tokens[1] == order)
+                {
+                    check = 1;
+                    handle_command_delete_type(order);
+                }
+                if(check == 0)
+                {
+                    throw NOT_FOUND;
+                }  
+            }
         }
 
         else if(tokens[0] == "PUT")
@@ -431,6 +480,28 @@ public:
             throw REQUEST_ERR;
     }
 
+    // void delete_song(const string& id)
+    // {
+    //     if (dynamic_cast<Artist*>(current_user) != nullptr) 
+    //     {
+    //         Artist* artist = dynamic_cast<Artist*>(current_user);
+    //         vector<Song> songs = artist->singer_musics();
+    //         for(int i = 0; i < songs.size(); i++)
+    //         {
+    //             if(songs[i].get_id() == stoi(id))
+    //             {
+    //                 for(Song& song : songs)
+    //                 {
+    //                     if(stoi(id) == song.get_id())
+    //                     {
+    //                         songs.
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         throw string("OK");
+    //     }        
+    // }
     void print_wanted_user(const string& id)
     {
         for(User* user : users)
@@ -504,6 +575,9 @@ public:
 
         get_orders.push_back("musics");
         get_orders.push_back("users");
+        get_orders.push_back("registered_musics");
+
+        delete_orders.push_back("music");
 
     }
     
@@ -528,6 +602,7 @@ public:
         {
             cout << "An unexpected error occurred." << endl;
         }
+        cout << endl;
         for(int i = 0; i < users.size(); i++)
         {
             cout << users[i]->user_name << " " << users[i]->get_password() << " " << users[i]->user_id << " " << users[i]->mode << endl;
