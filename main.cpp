@@ -19,6 +19,7 @@ public:
         info[2] = this->artist;
         return info;
     }
+    string get_song_name() {return song_name;};
     vector<string> get_full_info()
     {
         vector<string> info(8);
@@ -102,6 +103,8 @@ public:
     }
     string song_O_playlist;
     virtual int tot_song_o_playlist() = 0;
+    virtual vector<string> get_songs_playlists_name() = 0;
+
 private:
     string password;
 };
@@ -113,6 +116,9 @@ public:
     int tot_song_o_playlist() override
     {
         return playlist_num;
+    }
+    vector<string> get_songs_playlists_name() override
+    {
     }
 private:
     int playlist_num = 0;
@@ -133,6 +139,15 @@ public:
     int tot_song_o_playlist() override
     {
         return tot_songs;
+    }
+    vector<string> get_songs_playlists_name() override
+    {
+        vector<string> res;
+        for(Song& song : singer_songs)
+        {
+            res.push_back(song.get_song_name());
+        }
+        return res;
     }
 private:
     int tot_songs = 0;
@@ -340,7 +355,7 @@ public:
             }
             else
             {
-
+                print_wanted_user(declare_variables("id"));
             }
         }
     }
@@ -415,16 +430,35 @@ public:
         else
             throw REQUEST_ERR;
     }
-    // void print_user(int id)
-    // {
-    //     int n = id - 1;
-    //     cout << "ID: " << id;
-    //     cout << "Mode: " << users[n]->mode;
-    //     cout << "Username: " << users[n]->user_name;
-    //     cout << users[n]->song_O_playlist << ": ";
-    // }
+
+    void print_wanted_user(const string& id)
+    {
+        for(User* user : users)
+        {
+            if(user->user_id == stoi(id))
+            {
+                cout << "ID: " << user->user_id << endl;
+                cout << "Mode: " << user->mode << endl;
+                cout << "Username: " << user->user_name << endl;
+                cout << user->song_O_playlist << ": ";
+                vector<string> names = user->get_songs_playlists_name();
+                for(int i = 0; i < names.size(); i++)
+                {
+                    cout << names[i];
+                    if(i != names.size() - 1)
+                        cout << ", ";
+                }
+                cout << endl;
+                return;
+            }
+        }
+        throw NOT_FOUND;
+    }
+
     void print_all_users()
     {
+        if(users.size() == 0)
+            throw EMPTY;
         cout << "ID, Mode, Username, Playlists_number/Songs_number" << endl;
         for(User* user : users)
         {
@@ -442,6 +476,8 @@ public:
     }
     void print_all_songs()
     {
+        if(songs.size() == 0)
+            throw EMPTY;
         cout << "ID, Name, Artist" << endl;
         for(auto& song : songs)
         {
