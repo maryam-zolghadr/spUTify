@@ -7,6 +7,51 @@
 #define PERMISSION_DENIED "Permission Denied"
 #define EMPTY "Empty"
 using namespace std;
+
+
+string convert_format_time(const string& input) 
+{
+    stringstream ss(input);
+    int hours = 0, minutes = 0, seconds = 0;
+    char delimiter;
+    ss >> hours >> delimiter >> minutes >> delimiter >> seconds;
+    string output = (hours < 10 ? "0" : "") + to_string(hours) + ":" + (minutes < 10 ? "0" : "") + to_string(minutes) + ":" + (seconds < 10 ? "0" : "") + to_string(seconds);
+    return output;
+}
+
+string sum_durations(const string& time1, const string& time2) 
+{
+    int hours1, minutes1, seconds1;
+    int hours2, minutes2, seconds2;
+    int totalHours, totalMinutes, totalSeconds;
+
+    stringstream ss1(time1);
+    ss1 >> hours1;
+    ss1.ignore();
+    ss1 >> minutes1;
+    ss1.ignore();
+    ss1 >> seconds1;
+
+    stringstream ss2(time2);
+    ss2 >> hours2;
+    ss2.ignore();
+    ss2 >> minutes2;
+    ss2.ignore();
+    ss2 >> seconds2;
+
+    totalSeconds = seconds1 + seconds2;
+    totalMinutes = minutes1 + minutes2 + (totalSeconds / 60);
+    totalHours = hours1 + hours2 + (totalMinutes / 60);
+
+    totalSeconds %= 60;
+    totalMinutes %= 60;
+
+    stringstream ss;
+    ss << totalHours << ":" << totalMinutes << ":" << totalSeconds;
+    string res = ss.str();
+
+    return convert_format_time(res);
+}
 class Song
 {
 public:
@@ -32,7 +77,7 @@ public:
         info[3] = tmp2;
         info[4] = this->album;
         info[5] = this->tmp_tag;
-        info[6] = this->duration;
+        info[6] = get_duration();
         return info;
     }
     void set_song(const string& title, const string& path, const string& year, const string& album, const string& tags, const string& s_duration, const int& id, const string& artist)
@@ -50,8 +95,9 @@ public:
         {
             this->tags.push_back(token);
         }
-        this->duration = s_duration; // edit this
+        this->duration = convert_format_time(s_duration); // edit this
     }
+    string get_duration() {return duration;};
     int get_id() {return song_id;};
     private:
     string tmp_tag;
@@ -65,6 +111,18 @@ public:
     vector<string> tags;
 };
 
+class Playlist
+{
+public:
+    Playlist() {}
+    void create_playlist(const string& name) {this->name = name;};
+    string get_name(){return name;};
+    void add_song(const Song& song){songs.push_back(song);};
+    vector<Song> get_songs() {return songs;};
+    vector<Song> songs;
+private:
+    string name;
+};
 class User
 {
 public:
@@ -117,11 +175,49 @@ public:
     {
         return playlist_num;
     }
-    vector<string> get_songs_playlists_name() override
+    void create_playlist(const string& name)
     {
+        Playlist playlist;
+        playlist.create_playlist(name);
+        playlists.push_back(playlist);
+        playlist_num += 1;
     }
+    void add_song(const string& name, const Song& song)
+    {
+        for(int i = 0; i < playlists.size(); i++)
+        {
+            if(playlists[i].get_name() == name)
+            {
+                playlists[i].add_song(song);
+            }
+        }
+    }
+    void delete_song(const int& id)
+    {
+        for(int i = 0; i < playlists.size(); i++)
+        {
+            for(int j = 0; j < playlists[i].get_songs().size(); j++)
+            {
+                if(playlists[i].get_songs()[j].get_id() == id)
+                {
+                    playlists[i].songs.erase(playlists[i].songs.begin() + j);
+                }
+            }
+        }
+    }
+    vector<string> get_songs_playlists_name() override 
+    { 
+        vector<string> res;
+        for(Playlist& playlist : playlists)
+        {
+            res.push_back(playlist.get_name());
+        }
+        return res;
+    }
+    vector<Playlist> get_playlists(){return playlists;};
 private:
     int playlist_num = 0;
+    vector<Playlist> playlists;
 };
 
 class Artist : public User
@@ -148,6 +244,17 @@ public:
             res.push_back(song.get_song_name());
         }
         return res;
+    }
+    void delete_song(const int& id)
+    {
+        for (auto it = singer_songs.begin(); it != singer_songs.end(); ++it) 
+        {
+            if (it->get_id() == id) 
+            {
+                singer_songs.erase(it);
+                break;
+            }
+        }
     }
     vector<Song> singer_musics() {return singer_songs;};
 private:
@@ -311,6 +418,18 @@ public:
             }        
             login(declare_variables("username"), declare_variables("password"));
         }
+        if(order == "playlist")
+        {
+            if(current_user == nullptr)
+            {
+                throw PERMISSION_DENIED;
+            } 
+            if(current_user->mode != "user")
+            {
+                throw PERMISSION_DENIED;
+            }
+            create_playlist(declare_variables("name"));            
+        }
     }
     void add_music()
     {
@@ -320,6 +439,23 @@ public:
             Song tmp_song = artist->add_song(declare_variables("title"), declare_variables("path"), declare_variables("year"), declare_variables("album"), declare_variables("tags"), declare_variables("duration"), next_song_id);
             next_song_id += 1;
             songs.push_back(tmp_song);
+            throw string("OK");
+        }
+    }
+    void create_playlist(const string& name)
+    {
+        if (dynamic_cast<RegularUsr*>(current_user) != nullptr) 
+        {
+            RegularUsr* regular_user = dynamic_cast<RegularUsr*>(current_user);
+            vector<Playlist> user_playlists = regular_user->get_playlists();
+            for(Playlist& playlist : user_playlists)
+            {
+                if(playlist.get_name() == name)
+                {
+                    throw REQUEST_ERR;
+                }
+            }
+            regular_user->create_playlist(name);
             throw string("OK");
         }
     }
@@ -361,8 +497,57 @@ public:
         }
         if(order == "registered_musics")
         {
+            if(current_user->mode != "artist")
+                throw PERMISSION_DENIED;
             print_artist_musics();
         }
+        if(order == "playlist")
+        {
+            if(current_user->mode != "user")
+                throw PERMISSION_DENIED;          
+            get_user_playlist(declare_variables("id"));  
+        }
+    }
+
+    void get_user_playlist(const string& id)
+    {
+        if (dynamic_cast<RegularUsr*>(current_user) != nullptr) 
+        {
+            RegularUsr* regular_user = dynamic_cast<RegularUsr*>(current_user);
+            for(int i = 0; i < users.size(); i++)
+            {
+                if(users[i]->user_id == stoi(id))
+                {
+                    if(users[i]->mode == "artist")
+                        throw REQUEST_ERR;
+                    RegularUsr* wanted_user = dynamic_cast<RegularUsr*>(users[i]);
+                    cout << "Playlist_name, Songs_number, Duration" << endl;
+                    vector<Playlist> info = wanted_user->get_playlists();
+                    for(int k = 0; k < info.size(); k++)
+                    {
+                        string sum_duration = "00:00:00";
+                        vector<Song> this_playlist_songs = info[k].get_songs();
+                        cout << this_playlist_songs.size() << endl;
+                        for(int j = 0; j < this_playlist_songs.size(); j++)
+                        {
+                            sum_duration = sum_durations(this_playlist_songs[j].get_duration(), sum_duration);
+                        }
+                        cout << info[k].get_name() << ", "<< info[k].get_songs().size() << ", " << sum_duration;
+                        cout << endl;     
+                    }
+                    return;
+                }
+            }
+            throw NOT_FOUND;
+        }
+    }
+
+    void handle_command_put_type(const string& order)
+    {
+        if(order == "add_playlist")
+        {
+            add_song_to_playlist(declare_variables("name"), declare_variables("id"));
+        }        
     }
     void handle_command_delete_type(const string& order)
     {
@@ -370,12 +555,35 @@ public:
         {
             throw PERMISSION_DENIED;
         }
+        if(current_user->mode == "user")
+            throw PERMISSION_DENIED;
         if(order == "music")
         {
-            //delete_song(declare_variables("id"));
+            delete_song(declare_variables("id"));
         }
     }
-
+    void add_song_to_playlist(const string& name, const string& id)
+    {
+        if (dynamic_cast<RegularUsr*>(current_user) != nullptr) 
+        {
+            RegularUsr* regular_user = dynamic_cast<RegularUsr*>(current_user);
+            for(Playlist& playlist : regular_user->get_playlists())
+            {
+                if(playlist.get_name() == name)
+                {
+                    for(int i = 0; i < songs.size(); i++)
+                    {
+                        if(stoi(id) == songs[i].get_id())
+                        {
+                            regular_user->add_song(name, songs[i]);
+                            throw string("OK");
+                        }
+                    }
+                }
+            }
+            throw NOT_FOUND;
+        }
+    }
     void print_artist_musics()
     {
         cout << "ID, Name, Artist, Year, Album, Tags, Duration" << endl;
@@ -383,7 +591,6 @@ public:
         {
             Artist* artist = dynamic_cast<Artist*>(current_user);
             vector<Song> song_tmp = artist->singer_musics();  
-            cout << song_tmp.size() << endl;
             if(song_tmp.size() == 0)
                 throw EMPTY;
             for(int i = 0; i < song_tmp.size(); i++)
@@ -473,35 +680,56 @@ public:
 
         else if(tokens[0] == "PUT")
         {
-
+            for(const string& order : put_ordres)
+            {
+                if(tokens[1] == order)
+                {
+                    check = 1;
+                    handle_command_put_type(order);
+                }
+                if(check == 0)
+                {
+                    throw NOT_FOUND;
+                }  
+            }            
         }
 
         else
             throw REQUEST_ERR;
     }
 
-    // void delete_song(const string& id)
-    // {
-    //     if (dynamic_cast<Artist*>(current_user) != nullptr) 
-    //     {
-    //         Artist* artist = dynamic_cast<Artist*>(current_user);
-    //         vector<Song> songs = artist->singer_musics();
-    //         for(int i = 0; i < songs.size(); i++)
-    //         {
-    //             if(songs[i].get_id() == stoi(id))
-    //             {
-    //                 for(Song& song : songs)
-    //                 {
-    //                     if(stoi(id) == song.get_id())
-    //                     {
-    //                         songs.
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         throw string("OK");
-    //     }        
-    // }
+    void delete_song(const string& id)
+    {
+        if (dynamic_cast<Artist*>(current_user) != nullptr) 
+        {
+            Artist* artist = dynamic_cast<Artist*>(current_user);
+            vector<Song> musics = artist->singer_musics();
+            for(int i = 0; i < musics.size(); i++)
+            {
+                if(musics[i].get_id() == stoi(id))
+                {
+                    artist->delete_song(stoi(id));
+                }
+            }
+            for(int i = 0; i < songs.size(); i++)
+            {
+                if(songs[i].get_id() == stoi(id))
+                {
+                    songs.erase(songs.begin() + i);
+                }
+            }
+            for(int i = 0; i < users.size(); i++)
+            {
+                if(users[i]->mode == "user")
+                {
+                    RegularUsr* user = dynamic_cast<RegularUsr*>(users[i]);
+                    user->delete_song(stoi(id));
+                }
+            }
+            throw string("OK");
+        }        
+    }
+
     void print_wanted_user(const string& id)
     {
         for(User* user : users)
@@ -572,12 +800,15 @@ public:
         post_orders.push_back("logout");
         post_orders.push_back("playlist");
         post_orders.push_back("music");
-
+        
         get_orders.push_back("musics");
         get_orders.push_back("users");
         get_orders.push_back("registered_musics");
+        get_orders.push_back("playlist");
 
         delete_orders.push_back("music");
+
+        put_ordres.push_back("add_playlist");
 
     }
     
@@ -632,6 +863,7 @@ private:
     vector<string> put_ordres;
     vector<Song> songs;
     vector<string> tokens;
+    vector<Playlist> playlists;
 };
  
 int main(int argc, char* argv[])
